@@ -30,5 +30,51 @@ Route::get('/users', function () {
     $users = ExpenseUser::all();
 
     // Return the users as a JSON response
-    return response()->json($users);
+
+     // Check if there is no data
+     if ($users->isEmpty()) {
+        return response()->json([
+            'response' => [
+                'status' => false,
+                'message' => 'No data found'
+            ],
+            'data' => []
+        ]);
+    }
+
+    // return response()->json($users);
+    return response()->json([
+        'response' => [
+            'status' => true,
+            'message' => 'Data fetched successfully'
+        ],
+        'data' => $users
+
+    ]);
+});
+
+Route::post('/login', function(Request $request){
+$credentials = $request->validate([
+    'name' => 'required|string',
+    'password' => 'required',
+]);
+$user = ExpenseUser::where('name', $credentials['name'])->first();
+
+// if( $user && Hash::check($credentials['password'], $user->password) ){
+    if ($user && $credentials['password'] === $user->password) {
+        return response()->json([
+        'response' => [
+            'status' => true,
+            'message' => 'Login successful'
+        ],
+        'data' => $user
+    ]);
+} else {
+    return response()->json([
+        'response' => [
+            'status' => false,
+            'message' => 'Invalid credentials'
+        ]
+    ]);
+}
 });
