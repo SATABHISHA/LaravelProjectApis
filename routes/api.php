@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 
 /*
 |--------------------------------------------------------------------------
@@ -78,4 +79,31 @@ $user = ExpenseUser::where('name', $credentials['name'])->first();
         ]
     ]);
 }
+});
+
+Route::post('/register', function (Request $request) {
+    // Validate the incoming request data
+    $validatedData = $request->validate([
+        'name' => 'required|string|unique:users,name',
+        'password' => 'required|string|min:6',
+    ]);
+
+    // Insert the new user into the database
+    $user = DB::table('User')->insertGetId([
+        'name' => $validatedData['name'],
+        // 'password' => Hash::make($validatedData['password']), // Hash the password for security
+        'password' => $validatedData['password'], // Hash the password for security
+    ]);
+
+    // Return a success response
+    return response()->json([
+        'response' => [
+            'status' => true,
+            'message' => 'User registered successfully',
+        ],
+        'data' => [
+            'user_id' => $user,
+            'name' => $validatedData['name'],
+        ],
+    ]);
 });
