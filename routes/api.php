@@ -81,6 +81,7 @@ $user = ExpenseUser::where('name', $credentials['name'])->first();
 }
 });
 
+//Register Route
 Route::post('/register', function (Request $request) {
     // Validate the incoming request data
     $validatedData = $request->validate([
