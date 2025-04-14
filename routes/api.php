@@ -85,15 +85,26 @@ $user = ExpenseUser::where('name', $credentials['name'])->first();
 Route::post('/register', function (Request $request) {
     // Validate the incoming request data
     $validatedData = $request->validate([
-        'name' => 'required|string|unique:users,name',
+        'name' => 'required|string',
         'password' => 'required|string|min:6',
     ]);
+
+    // Check if the username already exists
+    $existingUser = DB::table('User')->where('name', $validatedData['name'])->first();
+
+    if ($existingUser) {
+        return response()->json([
+            'response' => [
+                'status' => false,
+                'message' => 'Username already exists',
+            ],
+        ]);
+    }
 
     // Insert the new user into the database
     $user = DB::table('User')->insertGetId([
         'name' => $validatedData['name'],
-        // 'password' => Hash::make($validatedData['password']), // Hash the password for security
-        'password' => $validatedData['password'], // Hash the password for security
+        'password' => Hash::make($validatedData['password']), // Hash the password for security
     ]);
 
     // Return a success response
