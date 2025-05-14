@@ -119,3 +119,50 @@ Route::post('/register', function (Request $request) {
         ],
     ]);
 });
+
+Route::post('/submitaccountsdetails', function (Request $request) {
+    // Validate the incoming request data
+    $validatedData = $request->validate([
+        'user_id' => 'required|exists:users,id',
+        'account_name' => 'required|string|max:255',
+        'bank_name' => 'required|string|max:255',
+        'remarks' => 'nullable|string',
+        'purpose' => 'required|string|max:255',
+        'date_time' => 'required|date',
+        'account_type' => 'required|string|max:255',
+        'balance' => 'required|numeric|min:0',
+    ]);
+
+    try {
+        // Insert the account details into the database
+        $account = DB::table('Accounts')->insert([
+            'user_id' => $validatedData['user_id'],
+            'account_name' => $validatedData['account_name'],
+            'bank_name' => $validatedData['bank_name'],
+            'remarks' => $validatedData['remarks'],
+            'purpose' => $validatedData['purpose'],
+            'date_time' => $validatedData['date_time'],
+            'account_type' => $validatedData['account_type'],
+            'balance' => $validatedData['balance'],
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Return a success response
+        return response()->json([
+            'response' => [
+                'status' => true,
+                'message' => 'Account details submitted successfully',
+            ],
+        ]);
+    } catch (\Exception $e) {
+        // Return an error response if the operation fails
+        return response()->json([
+            'response' => [
+                'status' => false,
+                'message' => 'Failed to submit account details',
+                'error' => $e->getMessage(), // Optional: Include the error message for debugging
+            ],
+        ], 500);
+    }
+});
