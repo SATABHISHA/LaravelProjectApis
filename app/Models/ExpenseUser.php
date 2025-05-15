@@ -11,5 +11,5 @@ class ExpenseUser extends Model
     protected $table = 'users';
 
     // Specify the columns that are mass assignable
-    protected $fillable = ['id', 'name', 'password'];
+    protected $fillable = ['name', 'password'];
 }

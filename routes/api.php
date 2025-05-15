@@ -81,6 +81,19 @@ $user = ExpenseUser::where('name', $credentials['name'])->first();
 }
 });
 
+Route::post('/registernew', function (Request $request) {
+    $validated = $request->validate([
+        'name' => 'required|string|unique:users,name',
+        'password' => 'required|string|min:6',
+    ]);
+    $user = ExpenseUser::create([
+        'name' => $validated['name'],
+        // 'password' => Hash::make($validated['password']),
+        'password' => 'required|string|min:6',
+    ]);
+    return response()->json(['status' => true, 'user' => $user]);
+});
+
 //Register Route
 Route::post('/register', function (Request $request) {
     // Validate the incoming request data
