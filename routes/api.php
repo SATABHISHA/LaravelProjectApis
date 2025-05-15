@@ -90,7 +90,7 @@ Route::post('/register', function (Request $request) {
     ]);
 
     // Check if the username already exists
-    $existingUser = DB::table('User')->where('name', $validatedData['name'])->first();
+    $existingUser = DB::table('users')->where('name', $validatedData['name'])->first();
 
     if ($existingUser) {
         return response()->json([
@@ -102,7 +102,7 @@ Route::post('/register', function (Request $request) {
     }
 
     // Insert the new user into the database
-    $user = DB::table('User')->insertGetId([
+    $user = DB::table('users')->insertGetId([
         'name' => $validatedData['name'],
         'password' => Hash::make($validatedData['password']), // Hash the password for security
     ]);
@@ -135,7 +135,7 @@ Route::post('/submitaccountsdetails', function (Request $request) {
 
     try {
         // Insert the account details into the database
-        $account = DB::table('Accounts')->insert([
+        $account = DB::table('accounts')->insert([
             'user_id' => $validatedData['user_id'],
             'account_name' => $validatedData['account_name'],
             'bank_name' => $validatedData['bank_name'],

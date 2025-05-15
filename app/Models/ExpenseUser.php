@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class ExpenseUser extends Model
 {
     use HasFactory;
-    protected $table = 'User';
+    protected $table = 'users';
 
     // Specify the columns that are mass assignable
     protected $fillable = ['id', 'name', 'password'];
