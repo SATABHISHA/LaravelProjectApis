@@ -81,17 +81,39 @@ $user = ExpenseUser::where('name', $credentials['name'])->first();
 }
 });
 
-Route::post('/registernew', function (Request $request) {
-    $validated = $request->validate([
-        'name' => 'required|string|unique:users,name',
-        'password' => 'required|string|min:6',
-    ]);
-    $user = ExpenseUser::create([
-        'name' => $validated['name'],
-        // 'password' => Hash::make($validated['password']),
-        'password' => 'required|string|min:6',
-    ]);
-    return response()->json(['status' => true, 'user' => $user]);
+Route::post('/RegisterNew', function (Request $request) {
+    try {
+        $validated = $request->validate([
+            'name' => 'required|string',
+            'password' => 'required|string|min:6',
+        ]);
+
+        // Check if user already exists
+        if (ExpenseUser::where('name', $validated['name'])->exists()) {
+            return response()->json([
+                'status' => false,
+                'message' => 'User already exists'
+            ]);
+        }
+
+        // Create new user
+        $user = ExpenseUser::create([
+            'name' => $validated['name'],
+            // 'password' => Hash::make($validated['password']),
+            'password' => $validated['password'],
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'User registered successfully',
+            'user' => $user
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'status' => false,
+            'message' => 'Server error: ' . $e->getMessage()
+        ], 500);
+    }
 });
 
 //Register Route
