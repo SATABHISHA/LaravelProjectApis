@@ -179,3 +179,81 @@ Route::post('/submitaccountsdetails', function (Request $request) {
         ], 500);
     }
 });
+
+Route::get('/AccountsDetailsByDate/{user_id}/{date}', function ($user_id, $date) {
+    // $date should be in 'YYYY-MM-DD' format
+
+    $accounts = DB::table('accounts')
+        ->where('user_id', $user_id)
+        ->where('date_time', 'like', $date . '%')
+        ->get();
+
+    if ($accounts->isEmpty()) {
+        return response()->json([
+            'response' => [
+                'status' => false,
+                'message' => 'No data found'
+            ],
+            'data' => []
+        ]);
+    }
+
+    return response()->json([
+        'response' => [
+            'status' => true,
+            'message' => 'Data fetched successfully'
+        ],
+        'data' => $accounts
+    ]);
+});
+
+Route::get('/RecentAccounts/{user_id}', function ($user_id) {
+    $accounts = DB::table('accounts')
+        ->where('user_id', $user_id)
+        ->orderBy('created_at', 'desc')
+        ->limit(15)
+        ->get();
+
+    if ($accounts->isEmpty()) {
+        return response()->json([
+            'response' => [
+                'status' => false,
+                'message' => 'No data found'
+            ],
+            'data' => []
+        ]);
+    }
+
+    return response()->json([
+        'response' => [
+            'status' => true,
+            'message' => 'Recent accounts fetched successfully'
+        ],
+        'data' => $accounts
+    ]);
+});
+
+Route::get('/AllAccountsByUser/{user_id}', function ($user_id) {
+    $accounts = DB::table('accounts')
+        ->where('user_id', $user_id)
+        ->orderBy('created_at', 'desc')
+        ->get();
+
+    if ($accounts->isEmpty()) {
+        return response()->json([
+            'response' => [
+                'status' => false,
+                'message' => 'No data found'
+            ],
+            'data' => []
+        ]);
+    }
+
+    return response()->json([
+        'response' => [
+            'status' => true,
+            'message' => 'Accounts fetched successfully'
+        ],
+        'data' => $accounts
+    ]);
+});
