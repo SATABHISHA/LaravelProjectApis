@@ -22,3 +22,15 @@ Route::get('/test', function () {
 // Route::get('/', function () {
 //     dd('Root route is working!');
 // });
+Route::get('/storage-link', function() {
+    if(file_exists(public_path('storage'))) {
+        return 'The "public/storage" directory already exists.';
+    }
+    
+    app('files')->link(
+        storage_path('app/public'), 
+        public_path('storage')
+    );
+    
+    return 'The [public/storage] directory has been linked.';
+});
