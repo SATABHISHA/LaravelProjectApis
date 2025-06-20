@@ -305,7 +305,7 @@ Route::post('/upload-file', function (Request $request) {
 
         return response()->json([
             'status' => true,
-            'message' => 'File uploaded successfully',
+            'message' => 'File has been uploaded successfully',
             'file_id' => $fileRecord,
             'file_path' => $filePath
         ]);
