@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use App\Models\File;
 
 class FileController extends Controller
 {
@@ -22,19 +22,17 @@ class FileController extends Controller
             $fileName = time() . '_' . $file->getClientOriginalName();
             $filePath = $file->storeAs('uploads', $fileName, 'public');
 
-            $fileRecord = DB::table('files')->insertGetId([
+            $fileRecord = File::create([
                 'user_id' => $validated['user_id'],
                 'fileName' => $fileName,
                 'filePath' => $filePath,
                 'category' => $validated['category'] ?? null,
-                'created_at' => now(),
-                'updated_at' => now(),
             ]);
 
             return response()->json([
                 'status' => true,
                 'message' => 'File has been uploaded successfully',
-                'file_id' => $fileRecord,
+                'file_id' => $fileRecord->id,
                 'file_path' => $filePath
             ]);
         } else {

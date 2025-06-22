@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use App\Models\Account;
 
 class AccountController extends Controller
 {
@@ -21,41 +21,21 @@ class AccountController extends Controller
             'balance' => 'required|numeric|min:0',
         ]);
 
-        try {
-            DB::table('accounts')->insert([
-                'user_id' => $validatedData['user_id'],
-                'account_name' => $validatedData['account_name'],
-                'bank_name' => $validatedData['bank_name'],
-                'remarks' => $validatedData['remarks'],
-                'purpose' => $validatedData['purpose'],
-                'date_time' => $validatedData['date_time'],
-                'account_type' => $validatedData['account_type'],
-                'balance' => $validatedData['balance'],
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-            return response()->json([
-                'response' => [
-                    'status' => true,
-                    'message' => 'Account details submitted successfully',
-                ],
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'response' => [
-                    'status' => false,
-                    'message' => 'Failed to submit account details',
-                    'error' => $e->getMessage(),
-                ],
-            ], 500);
-        }
+        $account = Account::create($validatedData);
+
+        return response()->json([
+            'response' => [
+                'status' => true,
+                'message' => 'Account details submitted successfully',
+            ],
+            'data' => $account,
+        ]);
     }
 
     public function accountsByDate($user_id, $date)
     {
-        $accounts = DB::table('accounts')
-            ->where('user_id', $user_id)
-            ->where('date_time', 'like', $date . '%')
+        $accounts = Account::where('user_id', $user_id)
+            ->whereDate('date_time', $date)
             ->get();
 
         if ($accounts->isEmpty()) {
@@ -79,8 +59,7 @@ class AccountController extends Controller
 
     public function recentAccounts($user_id)
     {
-        $accounts = DB::table('accounts')
-            ->where('user_id', $user_id)
+        $accounts = Account::where('user_id', $user_id)
             ->orderBy('created_at', 'desc')
             ->limit(15)
             ->get();
@@ -106,8 +85,7 @@ class AccountController extends Controller
 
     public function allAccountsByUser($user_id)
     {
-        $accounts = DB::table('accounts')
-            ->where('user_id', $user_id)
+        $accounts = Account::where('user_id', $user_id)
             ->orderBy('created_at', 'desc')
             ->get();
 

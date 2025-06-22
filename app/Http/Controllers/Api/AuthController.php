@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\DB;
 use App\Models\ExpenseUser;
 
 class AuthController extends Controller
@@ -18,7 +17,7 @@ class AuthController extends Controller
         ]);
         $user = ExpenseUser::where('name', $credentials['name'])->first();
 
-        if ($user && $credentials['password'] === $user->password) {
+        if ($user && Hash::check($credentials['password'], $user->password)) {
             return response()->json([
                 'response' => [
                     'status' => true,
@@ -39,22 +38,11 @@ class AuthController extends Controller
     public function register(Request $request)
     {
         $validatedData = $request->validate([
-            'name' => 'required|string',
+            'name' => 'required|string|unique:users,name',
             'password' => 'required|string|min:6',
         ]);
 
-        $existingUser = DB::table('users')->where('name', $validatedData['name'])->first();
-
-        if ($existingUser) {
-            return response()->json([
-                'response' => [
-                    'status' => false,
-                    'message' => 'Username already exists',
-                ],
-            ]);
-        }
-
-        $user = DB::table('users')->insertGetId([
+        $user = ExpenseUser::create([
             'name' => $validatedData['name'],
             'password' => Hash::make($validatedData['password']),
         ]);
@@ -64,10 +52,7 @@ class AuthController extends Controller
                 'status' => true,
                 'message' => 'User registered successfully',
             ],
-            'data' => [
-                'user_id' => $user,
-                'name' => $validatedData['name'],
-            ],
+            'data' => $user,
         ]);
     }
 }
