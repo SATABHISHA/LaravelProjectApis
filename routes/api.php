@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\FileController;
+use App\Http\Controllers\Api\NumberController;
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
@@ -21,3 +22,4 @@ Route::get('/AccountsDetailsByDate/{user_id}/{date}', [AccountController::class,
 Route::get('/RecentAccounts/{user_id}', [AccountController::class, 'recentAccounts']);
 Route::get('/AllAccountsByUser/{user_id}', [AccountController::class, 'allAccountsByUser']);
 Route::post('/upload-file', [FileController::class, 'upload']);
+Route::post('/number-to-words', [NumberController::class, 'numberToWords']);
