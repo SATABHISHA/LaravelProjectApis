@@ -14,6 +14,7 @@ Route::get('/hello', function () {
     return response()->json(['message' => 'Hello, API!']);
 });
 
+
 Route::get('/users', [UserController::class, 'index']);
 Route::post('/login', [AuthController::class, 'login']);
 Route::post('/register', [AuthController::class, 'register']);
