@@ -26,3 +26,68 @@ yarn-error.log
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Environment Files (sensitive data)
+.env.local
+.env.testing
+.env.staging
+.env.additions
+.env.*.local
+
+# Payment Gateway Logs and Keys
+cashfree_*.log
+payment_*.log
+*.pem
+*.key
+*.crt
+
+# IDE and Editor Files
+*.swp
+*.swo
+*~
+.vscode/settings.json
+.vscode/launch.json
+.vscode/extensions.json
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/dictionaries/
+.idea/vcs.xml
+.idea/jsLibraryMappings.xml
+
+# Laravel specific
+/bootstrap/cache/*.php
+/storage/logs/*.log
+/storage/framework/cache/data/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/storage/app/public/*
+!storage/app/public/.gitignore
+
+# Testing
+/coverage
+/.nyc_output
+/phpunit.xml
+/phpunit.xml.dist
+
+# Dependency directories
+composer.phar
+composer.lock.backup
+
+# Database
+*.sqlite
+*.sqlite3
+*.db
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# OS generated files
+Icon?
+.DocumentRevisions-V100
+.fseventsd
+.TemporaryItems
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
