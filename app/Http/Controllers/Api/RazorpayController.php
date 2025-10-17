@@ -28,7 +28,7 @@ class RazorpayController extends Controller
     /**
      * Create Razorpay payment order
      */
-    
+
     public function createPayment(Request $request)
     {
         try {
@@ -132,6 +132,9 @@ class RazorpayController extends Controller
      */
     private function generateCheckoutUrl($razorpayOrder, $user, $request)
     {
+        // Use production base URL for callbacks
+        $baseUrl = 'https://ourprojectapi.sroy.es/public/api';
+        
         $checkoutParams = [
             'key' => $this->keyId,
             'amount' => $razorpayOrder['amount'],
@@ -139,8 +142,8 @@ class RazorpayController extends Controller
             'name' => 'FlutterFlow Payment',
             'description' => $request->description ?? 'Payment for order',
             'order_id' => $razorpayOrder['id'],
-            'callback_url' => route('razorpay.callback'),
-            'cancel_url' => route('razorpay.cancel'),
+            'callback_url' => $baseUrl . '/razorpay/callback',
+            'cancel_url' => $baseUrl . '/razorpay/cancel',
             'prefill[name]' => $user->name,
             'prefill[email]' => $user->email,
             'prefill[contact]' => $user->phone ?? '9999999999',
