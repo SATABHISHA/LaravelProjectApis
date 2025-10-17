@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\AccountController;
 use App\Http\Controllers\Api\FileController;
 use App\Http\Controllers\Api\NumberController;
 use App\Http\Controllers\Api\PaymentController;
+use App\Http\Controllers\Api\RazorpayController;
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
     return $request->user();
@@ -63,13 +64,59 @@ Route::get('/payment/test', function () {
     ]);
 });
 
+// Razorpay Routes for Payment Integration
+Route::post('/razorpay/create', [RazorpayController::class, 'createPayment']);
+Route::post('/razorpay/verify', [RazorpayController::class, 'verifyPayment']);
+Route::get('/razorpay/status', [RazorpayController::class, 'getPaymentStatus']);
+Route::post('/razorpay/status', [RazorpayController::class, 'getPaymentStatus']); // Accept POST for FlutterFlow
+Route::get('/razorpay/user-payments', [RazorpayController::class, 'getUserPayments']);
+Route::post('/razorpay/user-payments', [RazorpayController::class, 'getUserPayments']); // Accept POST for FlutterFlow
+Route::post('/razorpay/refund', [RazorpayController::class, 'refundPayment']);
+
+// Razorpay Callback Routes (accessible without authentication)
+Route::get('/razorpay/callback', [RazorpayController::class, 'handleCallback'])->name('razorpay.callback');
+Route::get('/razorpay/cancel', [RazorpayController::class, 'handleCancel'])->name('razorpay.cancel');
+
+// Razorpay Test Route
+Route::get('/razorpay/test', function () {
+    return response()->json([
+        'message' => 'Razorpay Payment System is ready! (SANDBOX MODE)',
+        'environment' => 'sandbox',
+        'key_id_configured' => !empty(env('RAZORPAY_KEY_ID', 'rzp_test_RUX03OJs024Yes')),
+        'key_secret_configured' => !empty(env('RAZORPAY_KEY_SECRET', '212wP4jHAaC68JgtIzs76xpN')),
+        'timestamp' => now(),
+        'base_url' => 'https://ourprojectapi.sroy.es/public/api/',
+        'razorpay_urls' => [
+            'api_base' => 'https://api.razorpay.com/v1',
+            'checkout_base' => 'https://api.razorpay.com/v1/checkout/embedded'
+        ],
+        'endpoints' => [
+            'create_payment' => 'POST /razorpay/create',
+            'verify_payment' => 'POST /razorpay/verify',
+            'check_status' => 'GET|POST /razorpay/status',
+            'user_payments' => 'GET|POST /razorpay/user-payments',
+            'refund' => 'POST /razorpay/refund',
+            'callback' => 'GET /razorpay/callback',
+            'cancel' => 'GET /razorpay/cancel'
+        ],
+        'credentials' => [
+            'key_id' => 'rzp_test_RUX03OJs024Yes',
+            'environment' => 'Test/Sandbox'
+        ]
+    ]);
+});
+
 // Quick API test for FlutterFlow
 Route::get('/test-connection', function () {
     return response()->json([
         'success' => true,
         'message' => 'API connection successful',
         'server_time' => now(),
-        'ready_for_flutterflow' => true
+        'ready_for_flutterflow' => true,
+        'payment_gateways' => [
+            'cashfree' => 'production',
+            'razorpay' => 'sandbox'
+        ]
     ]);
 });
 
