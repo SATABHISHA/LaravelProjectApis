@@ -123,16 +123,19 @@ class PaymentController extends Controller
     }
 
     /**
-     * Get payment status
+     * Get payment status (supports both GET and POST)
      */
     public function getPaymentStatus(Request $request)
     {
         try {
+            // Handle both GET query params and POST body params
+            $orderId = $request->input('order_id') ?? $request->query('order_id');
+            
             $request->validate([
                 'order_id' => 'required|string'
             ]);
 
-            $payment = Payment::where('order_id', $request->order_id)->first();
+            $payment = Payment::where('order_id', $orderId)->first();
 
             if (!$payment) {
                 return response()->json([
@@ -224,25 +227,30 @@ class PaymentController extends Controller
     }
 
     /**
-     * Get user payment history
+     * Get user payment history (supports both GET and POST)
      */
     public function getUserPayments(Request $request)
     {
         try {
             $request->validate([
                 'user_id' => 'required|exists:users,id',
-                'status' => 'string|in:CREATED,PAID,FAILED,CANCELLED',
-                'limit' => 'integer|min:1|max:100'
+                'status' => 'nullable|string|in:CREATED,PAID,FAILED,CANCELLED',
+                'limit' => 'nullable|integer|min:1|max:100'
             ]);
 
-            $query = Payment::where('user_id', $request->user_id)
+            // Handle both GET query params and POST body params
+            $userId = $request->input('user_id') ?? $request->query('user_id');
+            $status = $request->input('status') ?? $request->query('status');
+            $limit = $request->input('limit') ?? $request->query('limit', 20);
+
+            $query = Payment::where('user_id', $userId)
                           ->orderBy('created_at', 'desc');
 
-            if ($request->has('status')) {
-                $query->where('status', $request->status);
+            if ($status) {
+                $query->where('status', $status);
             }
 
-            $payments = $query->limit($request->get('limit', 20))->get();
+            $payments = $query->limit($limit)->get();
 
             return response()->json([
                 'success' => true,

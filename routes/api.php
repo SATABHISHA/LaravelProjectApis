@@ -30,7 +30,9 @@ Route::post('/number-to-words', [NumberController::class, 'numberToWords']);
 // Payment Routes for Cashfree Integration
 Route::post('/payment/create', [PaymentController::class, 'createPayment']);
 Route::get('/payment/status', [PaymentController::class, 'getPaymentStatus']);
+Route::post('/payment/status', [PaymentController::class, 'getPaymentStatus']); // Accept POST for FlutterFlow
 Route::get('/payment/user-payments', [PaymentController::class, 'getUserPayments']);
+Route::post('/payment/user-payments', [PaymentController::class, 'getUserPayments']); // Accept POST for FlutterFlow
 Route::post('/payment/refund', [PaymentController::class, 'refundPayment']);
 
 // Payment Callback Routes (these should be accessible without authentication)
@@ -44,6 +46,24 @@ Route::get('/payment/test', function () {
         'environment' => env('CASHFREE_ENVIRONMENT', 'not configured'),
         'app_id_configured' => !empty(env('CASHFREE_APP_ID')),
         'secret_configured' => !empty(env('CASHFREE_SECRET_KEY')),
-        'timestamp' => now()
+        'timestamp' => now(),
+        'base_url' => 'https://ourprojectapi.sroy.es/public/api/',
+        'endpoints' => [
+            'create_payment' => 'POST /payment/create',
+            'check_status' => 'GET|POST /payment/status',
+            'user_payments' => 'GET|POST /payment/user-payments',
+            'callback' => 'GET /payment/callback',
+            'webhook' => 'POST /payment/webhook'
+        ]
+    ]);
+});
+
+// Quick API test for FlutterFlow
+Route::get('/test-connection', function () {
+    return response()->json([
+        'success' => true,
+        'message' => 'API connection successful',
+        'server_time' => now(),
+        'ready_for_flutterflow' => true
     ]);
 });
