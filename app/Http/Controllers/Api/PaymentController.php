@@ -19,10 +19,8 @@ class PaymentController extends Controller
 
     public function __construct()
     {
-        // Use sandbox URL for testing, production URL for live
-        $this->cashfreeBaseUrl = env('CASHFREE_ENVIRONMENT', 'sandbox') === 'production' 
-            ? 'https://api.cashfree.com' 
-            : 'https://sandbox.cashfree.com';
+        // Production configuration
+        $this->cashfreeBaseUrl = 'https://api.cashfree.com';
         
         $this->appId = env('CASHFREE_APP_ID');
         $this->secretKey = env('CASHFREE_SECRET_KEY');
@@ -90,15 +88,11 @@ class PaymentController extends Controller
                     'cashfree_response' => $responseData
                 ]);
 
-                // Construct the correct payment URL for Cashfree
+                // Construct the correct payment URL for Cashfree Production
                 $paymentUrl = null;
                 if (isset($responseData['payment_session_id']) && $responseData['order_status'] === 'ACTIVE') {
-                    // Use the correct Cashfree checkout URL format
-                    if (env('CASHFREE_ENVIRONMENT', 'sandbox') === 'production') {
-                        $paymentUrl = 'https://payments.cashfree.com/pay/' . $responseData['payment_session_id'];
-                    } else {
-                        $paymentUrl = 'https://payments-test.cashfree.com/pay/' . $responseData['payment_session_id'];
-                    }
+                    // Production Cashfree checkout URL
+                    $paymentUrl = 'https://payments.cashfree.com/pay/' . $responseData['payment_session_id'];
                 }
 
                 return response()->json([
