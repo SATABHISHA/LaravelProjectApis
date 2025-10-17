@@ -135,8 +135,9 @@ class RazorpayController extends Controller
         // Use production base URL for callbacks
         $baseUrl = 'https://ourprojectapi.sroy.es/public/api';
         
+        // Razorpay Standard Checkout parameters
         $checkoutParams = [
-            'key' => $this->keyId,
+            'key_id' => $this->keyId,
             'amount' => $razorpayOrder['amount'],
             'currency' => $razorpayOrder['currency'],
             'name' => 'FlutterFlow Payment',
@@ -144,17 +145,18 @@ class RazorpayController extends Controller
             'order_id' => $razorpayOrder['id'],
             'callback_url' => $baseUrl . '/razorpay/callback',
             'cancel_url' => $baseUrl . '/razorpay/cancel',
-            'prefill[name]' => $user->name,
-            'prefill[email]' => $user->email,
-            'prefill[contact]' => $user->phone ?? '9999999999',
-            'theme[color]' => '#3399cc'
+            'prefill.name' => $user->name,
+            'prefill.email' => $user->email,
+            'prefill.contact' => $user->phone ?? '9999999999',
+            'theme.color' => '#3399cc',
+            'modal.ondismiss' => 'function(){window.location="' . $baseUrl . '/razorpay/cancel?order_id=' . $razorpayOrder['id'] . '"}'
         ];
 
-        // Build query string
+        // Build query string for Razorpay Standard Checkout
         $queryString = http_build_query($checkoutParams);
         
-        // Return Razorpay checkout URL
-        return 'https://api.razorpay.com/v1/checkout/embedded?' . $queryString;
+        // Return Razorpay Standard Checkout URL (this redirects to Razorpay's hosted payment page)
+        return 'https://checkout.razorpay.com/v1/checkout?' . $queryString;
     }
 
     /**
