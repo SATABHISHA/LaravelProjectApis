@@ -135,28 +135,25 @@ class RazorpayController extends Controller
         // Use production base URL for callbacks
         $baseUrl = 'https://ourprojectapi.sroy.es/public/api';
         
-        // Razorpay Standard Checkout parameters
-        $checkoutParams = [
-            'key_id' => $this->keyId,
+        // For FlutterFlow WebView integration, we need to return the data for Razorpay JS SDK
+        // But since direct URL is needed, let's create a custom payment page URL
+        
+        // Generate a simple payment page URL that will handle Razorpay integration
+        $paymentPageUrl = $baseUrl . '/razorpay/payment-page?' . http_build_query([
+            'order_id' => $razorpayOrder['id'],
             'amount' => $razorpayOrder['amount'],
             'currency' => $razorpayOrder['currency'],
-            'name' => 'FlutterFlow Payment',
-            'description' => $request->description ?? 'Payment for order',
-            'order_id' => $razorpayOrder['id'],
-            'callback_url' => $baseUrl . '/razorpay/callback',
-            'cancel_url' => $baseUrl . '/razorpay/cancel',
-            'prefill.name' => $user->name,
-            'prefill.email' => $user->email,
-            'prefill.contact' => $user->phone ?? '9999999999',
-            'theme.color' => '#3399cc',
-            'modal.ondismiss' => 'function(){window.location="' . $baseUrl . '/razorpay/cancel?order_id=' . $razorpayOrder['id'] . '"}'
-        ];
-
-        // Build query string for Razorpay Standard Checkout
-        $queryString = http_build_query($checkoutParams);
+            'key' => $this->keyId,
+            'name' => urlencode('FlutterFlow Payment'),
+            'description' => urlencode($request->description ?? 'Payment for order'),
+            'prefill_name' => urlencode($user->name),
+            'prefill_email' => urlencode($user->email ?? 'user@example.com'),
+            'prefill_contact' => urlencode($user->phone ?? '9999999999'),
+            'callback_url' => urlencode($baseUrl . '/razorpay/callback'),
+            'cancel_url' => urlencode($baseUrl . '/razorpay/cancel')
+        ]);
         
-        // Return Razorpay Standard Checkout URL (this redirects to Razorpay's hosted payment page)
-        return 'https://checkout.razorpay.com/v1/checkout?' . $queryString;
+        return $paymentPageUrl;
     }
 
     /**
@@ -499,5 +496,364 @@ class RazorpayController extends Controller
         } catch (Exception $e) {
             Log::error('Failed to update Razorpay payment status: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Display custom payment page for Razorpay integration
+     */
+    public function paymentPage(Request $request)
+    {
+        // Get all parameters from query string
+        $orderId = $request->order_id;
+        $amount = $request->amount;
+        $currency = $request->currency;
+        $key = $request->key;
+        $name = urldecode($request->name ?? 'Payment');
+        $description = urldecode($request->description ?? 'Order Payment');
+        $prefillName = urldecode($request->prefill_name ?? '');
+        $prefillEmail = urldecode($request->prefill_email ?? '');
+        $prefillContact = urldecode($request->prefill_contact ?? '');
+        $callbackUrl = urldecode($request->callback_url ?? '');
+        $cancelUrl = urldecode($request->cancel_url ?? '');
+
+        // Generate HTML page with Razorpay integration
+        $html = '<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Razorpay Payment</title>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .payment-container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+        .payment-title {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .payment-details {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .amount {
+            font-size: 24px;
+            font-weight: bold;
+            color: #28a745;
+            margin: 10px 0;
+        }
+        .pay-button {
+            background: #3399cc;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        .pay-button:hover {
+            background: #2680b3;
+        }
+        .cancel-button {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .loading {
+            display: none;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="payment-container">
+        <h2 class="payment-title">' . htmlspecialchars($name) . '</h2>
+        <div class="payment-details">
+            <p><strong>Description:</strong> ' . htmlspecialchars($description) . '</p>
+            <p class="amount">₹' . number_format($amount/100, 2) . '</p>
+            <p><strong>Order ID:</strong> ' . htmlspecialchars($orderId) . '</p>
+        </div>
+        
+        <button class="pay-button" onclick="startPayment()">Pay Now with Razorpay</button>
+        <div class="loading" id="loading">Processing payment...</div>
+        <a href="' . htmlspecialchars($cancelUrl) . '?order_id=' . htmlspecialchars($orderId) . '" class="cancel-button">Cancel Payment</a>
+    </div>
+
+    <script>
+    function startPayment() {
+        document.getElementById("loading").style.display = "block";
+        
+        var options = {
+            "key": "' . htmlspecialchars($key) . '",
+            "amount": "' . htmlspecialchars($amount) . '",
+            "currency": "' . htmlspecialchars($currency) . '",
+            "name": "' . htmlspecialchars($name) . '",
+            "description": "' . htmlspecialchars($description) . '",
+            "order_id": "' . htmlspecialchars($orderId) . '",
+            "handler": function (response) {
+                // Payment successful
+                console.log("Payment Success:", response);
+                
+                // Redirect to callback with payment details
+                var form = document.createElement("form");
+                form.method = "POST";
+                form.action = "' . htmlspecialchars($callbackUrl) . '";
+                
+                var fields = ["razorpay_payment_id", "razorpay_order_id", "razorpay_signature"];
+                fields.forEach(function(field) {
+                    var input = document.createElement("input");
+                    input.type = "hidden";
+                    input.name = field;
+                    input.value = response[field];
+                    form.appendChild(input);
+                });
+                
+                // Add CSRF token for Laravel
+                var csrfInput = document.createElement("input");
+                csrfInput.type = "hidden";
+                csrfInput.name = "_token";
+                csrfInput.value = "' . csrf_token() . '";
+                form.appendChild(csrfInput);
+                
+                document.body.appendChild(form);
+                form.submit();
+            },
+            "prefill": {
+                "name": "' . htmlspecialchars($prefillName) . '",
+                "email": "' . htmlspecialchars($prefillEmail) . '",
+                "contact": "' . htmlspecialchars($prefillContact) . '"
+            },
+            "theme": {
+                "color": "#3399cc"
+            },
+            "modal": {
+                "ondismiss": function() {
+                    document.getElementById("loading").style.display = "none";
+                    console.log("Payment cancelled by user");
+                }
+            }
+        };
+        
+        var rzp = new Razorpay(options);
+        rzp.open();
+    }
+    
+    // Auto-trigger payment when page loads (for seamless WebView experience)
+    window.onload = function() {
+        setTimeout(startPayment, 1000);
+    };
+    </script>
+</body>
+</html>';
+
+        return response($html, 200, ['Content-Type' => 'text/html']);
+    }
+
+    /**
+     * Handle successful payment callback
+     */
+    public function callback(Request $request)
+    {
+        try {
+            $razorpayPaymentId = $request->razorpay_payment_id;
+            $razorpayOrderId = $request->razorpay_order_id;
+            $razorpaySignature = $request->razorpay_signature;
+
+            // Verify payment signature
+            $signature = hash_hmac('sha256', 
+                $razorpayOrderId . '|' . $razorpayPaymentId, 
+                $this->keySecret
+            );
+
+            if ($signature !== $razorpaySignature) {
+                throw new Exception('Invalid payment signature');
+            }
+
+            // Update payment status
+            $payment = Payment::where('gateway_order_id', $razorpayOrderId)->first();
+            
+            if ($payment) {
+                $payment->update([
+                    'status' => 'PAID',
+                    'gateway_payment_id' => $razorpayPaymentId,
+                    'gateway_response' => json_encode($request->all()),
+                    'paid_at' => now()
+                ]);
+
+                // Return success page
+                $html = '<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Successful</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f8f9fa; margin: 0; padding: 20px; }
+        .container { max-width: 500px; margin: 50px auto; background: white; border-radius: 10px; padding: 30px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .success-icon { font-size: 50px; color: #28a745; margin-bottom: 20px; }
+        .success-title { color: #28a745; margin-bottom: 15px; }
+        .details { background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .detail-row { display: flex; justify-content: space-between; margin: 10px 0; }
+        .back-button { background: #007bff; color: white; padding: 12px 30px; border: none; border-radius: 5px; text-decoration: none; display: inline-block; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success-icon">✅</div>
+        <h2 class="success-title">Payment Successful!</h2>
+        <p>Your payment has been processed successfully.</p>
+        
+        <div class="details">
+            <div class="detail-row">
+                <span><strong>Payment ID:</strong></span>
+                <span>' . htmlspecialchars($razorpayPaymentId) . '</span>
+            </div>
+            <div class="detail-row">
+                <span><strong>Order ID:</strong></span>
+                <span>' . htmlspecialchars($razorpayOrderId) . '</span>
+            </div>
+            <div class="detail-row">
+                <span><strong>Amount:</strong></span>
+                <span>₹' . number_format((float)$payment->amount, 2) . '</span>
+            </div>
+            <div class="detail-row">
+                <span><strong>Status:</strong></span>
+                <span style="color: #28a745; font-weight: bold;">Completed</span>
+            </div>
+        </div>
+        
+        <a href="#" onclick="window.close()" class="back-button">Close</a>
+    </div>
+    
+    <script>
+    // For FlutterFlow integration - post message to parent
+    if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+            type: "payment_success",
+            payment_id: "' . htmlspecialchars($razorpayPaymentId) . '",
+            order_id: "' . htmlspecialchars($razorpayOrderId) . '",
+            amount: ' . $payment->amount . ',
+            status: "PAID"
+        }, "*");
+    }
+    </script>
+</body>
+</html>';
+
+                return response($html, 200, ['Content-Type' => 'text/html']);
+            }
+
+            throw new Exception('Payment record not found');
+
+        } catch (Exception $e) {
+            Log::error('Razorpay callback error: ' . $e->getMessage());
+            
+            // Return error page
+            $html = '<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Failed</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f8f9fa; margin: 0; padding: 20px; }
+        .container { max-width: 500px; margin: 50px auto; background: white; border-radius: 10px; padding: 30px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .error-icon { font-size: 50px; color: #dc3545; margin-bottom: 20px; }
+        .error-title { color: #dc3545; margin-bottom: 15px; }
+        .back-button { background: #6c757d; color: white; padding: 12px 30px; border: none; border-radius: 5px; text-decoration: none; display: inline-block; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="error-icon">❌</div>
+        <h2 class="error-title">Payment Failed</h2>
+        <p>Sorry, there was an issue processing your payment.</p>
+        <p><em>' . htmlspecialchars($e->getMessage()) . '</em></p>
+        <a href="#" onclick="window.close()" class="back-button">Close</a>
+    </div>
+</body>
+</html>';
+
+            return response($html, 400, ['Content-Type' => 'text/html']);
+        }
+    }
+
+    /**
+     * Handle payment cancellation
+     */
+    public function cancel(Request $request)
+    {
+        $orderId = $request->query('order_id');
+        
+        if ($orderId) {
+            $payment = Payment::where('gateway_order_id', $orderId)->first();
+            if ($payment) {
+                $payment->update(['status' => 'CANCELLED']);
+            }
+        }
+
+        $html = '<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Cancelled</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f8f9fa; margin: 0; padding: 20px; }
+        .container { max-width: 500px; margin: 50px auto; background: white; border-radius: 10px; padding: 30px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .cancel-icon { font-size: 50px; color: #ffc107; margin-bottom: 20px; }
+        .cancel-title { color: #856404; margin-bottom: 15px; }
+        .back-button { background: #6c757d; color: white; padding: 12px 30px; border: none; border-radius: 5px; text-decoration: none; display: inline-block; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="cancel-icon">⚠️</div>
+        <h2 class="cancel-title">Payment Cancelled</h2>
+        <p>You have cancelled the payment process.</p>
+        <p>You can try again later if needed.</p>
+        <a href="#" onclick="window.close()" class="back-button">Close</a>
+    </div>
+    
+    <script>
+    // For FlutterFlow integration - post message to parent
+    if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+            type: "payment_cancelled",
+            order_id: "' . htmlspecialchars($orderId ?? '') . '",
+            status: "CANCELLED"
+        }, "*");
+    }
+    </script>
+</body>
+</html>';
+
+        return response($html, 200, ['Content-Type' => 'text/html']);
     }
 }

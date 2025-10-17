@@ -74,8 +74,9 @@ Route::post('/razorpay/user-payments', [RazorpayController::class, 'getUserPayme
 Route::post('/razorpay/refund', [RazorpayController::class, 'refundPayment']);
 
 // Razorpay Callback Routes (accessible without authentication)
-Route::get('/razorpay/callback', [RazorpayController::class, 'handleCallback'])->name('razorpay.callback');
-Route::get('/razorpay/cancel', [RazorpayController::class, 'handleCancel'])->name('razorpay.cancel');
+Route::get('/razorpay/payment-page', [RazorpayController::class, 'paymentPage'])->name('razorpay.payment-page');
+Route::post('/razorpay/callback', [RazorpayController::class, 'callback'])->name('razorpay.callback');
+Route::get('/razorpay/cancel', [RazorpayController::class, 'cancel'])->name('razorpay.cancel');
 
 // Razorpay Test Route
 Route::get('/razorpay/test', function () {
