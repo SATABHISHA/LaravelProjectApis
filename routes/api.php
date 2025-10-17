@@ -67,3 +67,20 @@ Route::get('/test-connection', function () {
         'ready_for_flutterflow' => true
     ]);
 });
+
+// Debug endpoint for payment testing
+Route::post('/payment/debug-create', function (Request $request) {
+    return response()->json([
+        'success' => true,
+        'message' => 'Debug payment creation',
+        'received_data' => $request->all(),
+        'sample_response' => [
+            'order_id' => 'ORDER_' . time() . '_DEBUG',
+            'cf_order_id' => 'order_debug_123',
+            'payment_session_id' => 'session_debug_456',
+            'amount' => $request->amount ?? 100,
+            'currency' => 'INR',
+            'payment_url' => 'https://sandbox.cashfree.com/pg/checkout/v4?payment_session_id=session_debug_456'
+        ]
+    ]);
+});

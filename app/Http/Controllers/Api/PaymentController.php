@@ -90,6 +90,13 @@ class PaymentController extends Controller
                     'cashfree_response' => $responseData
                 ]);
 
+                // Construct the correct payment URL for Cashfree v4
+                $paymentUrl = null;
+                if (isset($responseData['payment_session_id']) && $responseData['order_status'] === 'ACTIVE') {
+                    // For Cashfree v4, use the payment_session_id with the checkout URL
+                    $paymentUrl = $this->cashfreeBaseUrl . '/pg/checkout/v4?payment_session_id=' . $responseData['payment_session_id'];
+                }
+
                 return response()->json([
                     'success' => true,
                     'message' => 'Payment order created successfully',
@@ -99,16 +106,25 @@ class PaymentController extends Controller
                         'payment_session_id' => $responseData['payment_session_id'],
                         'amount' => $request->amount,
                         'currency' => 'INR',
-                        'payment_url' => $responseData['order_status'] === 'ACTIVE' ? 
-                            $this->cashfreeBaseUrl . '/pg/view/order/' . $responseData['cf_order_id'] : null
+                                                'payment_url' => $paymentUrl,
+                        'cashfree_response' => $responseData // Include full response for debugging
                     ]
                 ], 200);
             } else {
-                Log::error('Cashfree order creation failed', ['response' => $response->body()]);
+                Log::error('Cashfree order creation failed', [
+                    'status_code' => $response->status(),
+                    'response_body' => $response->body(),
+                    'request_data' => $orderData
+                ]);
                 return response()->json([
                     'success' => false,
                     'message' => 'Failed to create payment order',
-                    'error' => $response->json()
+                    'error' => $response->json(),
+                    'debug_info' => [
+                        'status_code' => $response->status(),
+                        'cashfree_environment' => $this->cashfreeBaseUrl,
+                        'app_id_configured' => !empty($this->appId)
+                    ]
                 ], 400);
             }
 
