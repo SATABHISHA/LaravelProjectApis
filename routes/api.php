@@ -41,16 +41,22 @@ Route::post('/payment/webhook', [PaymentController::class, 'handleWebhook'])->na
 
 // Test route for payment system
 Route::get('/payment/test', function () {
+    $environment = env('CASHFREE_ENVIRONMENT', 'sandbox');
+    
     return response()->json([
         'message' => 'Cashfree Payment System is ready!',
-        'environment' => env('CASHFREE_ENVIRONMENT', 'not configured'),
+        'environment' => $environment,
         'app_id_configured' => !empty(env('CASHFREE_APP_ID')),
         'secret_configured' => !empty(env('CASHFREE_SECRET_KEY')),
         'timestamp' => now(),
         'base_url' => 'https://ourprojectapi.sroy.es/public/api/',
+        'cashfree_urls' => [
+            'api_base' => $environment === 'production' ? 'https://api.cashfree.com' : 'https://sandbox.cashfree.com',
+            'checkout_base' => $environment === 'production' ? 'https://payments.cashfree.com/pay/' : 'https://payments-test.cashfree.com/pay/'
+        ],
         'endpoints' => [
             'create_payment' => 'POST /payment/create',
-            'check_status' => 'GET|POST /payment/status',
+            'check_status' => 'GET|POST /payment/status', 
             'user_payments' => 'GET|POST /payment/user-payments',
             'callback' => 'GET /payment/callback',
             'webhook' => 'POST /payment/webhook'
@@ -70,17 +76,32 @@ Route::get('/test-connection', function () {
 
 // Debug endpoint for payment testing
 Route::post('/payment/debug-create', function (Request $request) {
+    $environment = env('CASHFREE_ENVIRONMENT', 'sandbox');
+    $sampleSessionId = 'session_debug_456';
+    
+    // Generate correct payment URL based on environment
+    if ($environment === 'production') {
+        $paymentUrl = 'https://payments.cashfree.com/pay/' . $sampleSessionId;
+    } else {
+        $paymentUrl = 'https://payments-test.cashfree.com/pay/' . $sampleSessionId;
+    }
+    
     return response()->json([
         'success' => true,
         'message' => 'Debug payment creation',
         'received_data' => $request->all(),
+        'environment' => $environment,
+        'correct_url_format' => [
+            'sandbox' => 'https://payments-test.cashfree.com/pay/{session_id}',
+            'production' => 'https://payments.cashfree.com/pay/{session_id}'
+        ],
         'sample_response' => [
             'order_id' => 'ORDER_' . time() . '_DEBUG',
             'cf_order_id' => 'order_debug_123',
-            'payment_session_id' => 'session_debug_456',
+            'payment_session_id' => $sampleSessionId,
             'amount' => $request->amount ?? 100,
             'currency' => 'INR',
-            'payment_url' => 'https://sandbox.cashfree.com/pg/checkout/v4?payment_session_id=session_debug_456'
+            'payment_url' => $paymentUrl
         ]
     ]);
 });

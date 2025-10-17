@@ -90,11 +90,15 @@ class PaymentController extends Controller
                     'cashfree_response' => $responseData
                 ]);
 
-                // Construct the correct payment URL for Cashfree v4
+                // Construct the correct payment URL for Cashfree
                 $paymentUrl = null;
                 if (isset($responseData['payment_session_id']) && $responseData['order_status'] === 'ACTIVE') {
-                    // For Cashfree v4, use the payment_session_id with the checkout URL
-                    $paymentUrl = $this->cashfreeBaseUrl . '/pg/checkout/v4?payment_session_id=' . $responseData['payment_session_id'];
+                    // Use the correct Cashfree checkout URL format
+                    if (env('CASHFREE_ENVIRONMENT', 'sandbox') === 'production') {
+                        $paymentUrl = 'https://payments.cashfree.com/pay/' . $responseData['payment_session_id'];
+                    } else {
+                        $paymentUrl = 'https://payments-test.cashfree.com/pay/' . $responseData['payment_session_id'];
+                    }
                 }
 
                 return response()->json([
