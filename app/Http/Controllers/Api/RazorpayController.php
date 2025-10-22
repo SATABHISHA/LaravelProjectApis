@@ -301,6 +301,7 @@ class RazorpayController extends Controller
             $request->validate([
                 'order_id' => 'required|string'
             ]);
+        
 
             $payment = Payment::where('order_id', $orderId)->where('gateway', 'razorpay')->first();
 
