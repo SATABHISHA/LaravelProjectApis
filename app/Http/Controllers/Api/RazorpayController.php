@@ -619,8 +619,20 @@ class RazorpayController extends Controller
             "handler": function (response) {
                 // Payment successful
                 console.log("Payment Success:", response);
+                document.getElementById("loading").innerHTML = "✅ Payment successful! Redirecting...";
                 
-                // Redirect to callback with payment details
+                // For FlutterFlow - immediately post success message to parent
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({
+                        type: "razorpay_payment_success",
+                        payment_id: response.razorpay_payment_id,
+                        order_id: response.razorpay_order_id,
+                        signature: response.razorpay_signature,
+                        action: "navigate_to_main"
+                    }, "*");
+                }
+                
+                // Submit to callback for server-side verification
                 var form = document.createElement("form");
                 form.method = "POST";
                 form.action = "' . htmlspecialchars($callbackUrl) . '";
@@ -656,6 +668,15 @@ class RazorpayController extends Controller
                 "ondismiss": function() {
                     document.getElementById("loading").style.display = "none";
                     console.log("Payment cancelled by user");
+                    
+                    // Notify FlutterFlow about cancellation
+                    if (window.parent && window.parent !== window) {
+                        window.parent.postMessage({
+                            type: "razorpay_payment_cancelled",
+                            order_id: "' . htmlspecialchars($orderId) . '",
+                            action: "stay_on_payment_page"
+                        }, "*");
+                    }
                 }
             }
         };
@@ -706,7 +727,7 @@ class RazorpayController extends Controller
                     'paid_at' => now()
                 ]);
 
-                // Return success page
+                // For FlutterFlow integration - redirect to success page with auto-close
                 $html = '<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -714,54 +735,101 @@ class RazorpayController extends Controller
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Payment Successful</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #f8f9fa; margin: 0; padding: 20px; }
-        .container { max-width: 500px; margin: 50px auto; background: white; border-radius: 10px; padding: 30px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        .success-icon { font-size: 50px; color: #28a745; margin-bottom: 20px; }
-        .success-title { color: #28a745; margin-bottom: 15px; }
-        .details { background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0; }
-        .detail-row { display: flex; justify-content: space-between; margin: 10px 0; }
-        .back-button { background: #007bff; color: white; padding: 12px 30px; border: none; border-radius: 5px; text-decoration: none; display: inline-block; margin-top: 20px; }
+        body { font-family: Arial, sans-serif; background: linear-gradient(135deg, #28a745, #20c997); margin: 0; padding: 20px; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
+        .container { max-width: 400px; background: white; border-radius: 15px; padding: 30px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .success-icon { font-size: 60px; margin-bottom: 20px; }
+        .success-title { color: #28a745; margin-bottom: 15px; font-size: 24px; }
+        .success-message { color: #666; margin-bottom: 20px; line-height: 1.5; }
+        .redirect-info { background: #e3f2fd; color: #1976d2; padding: 15px; border-radius: 8px; margin: 20px 0; font-size: 14px; }
+        .countdown { font-size: 18px; font-weight: bold; color: #28a745; margin: 15px 0; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="success-icon">✅</div>
         <h2 class="success-title">Payment Successful!</h2>
-        <p>Your payment has been processed successfully.</p>
+        <p class="success-message">Your payment of ₹' . number_format((float)$payment->amount, 2) . ' has been processed successfully.</p>
         
-        <div class="details">
-            <div class="detail-row">
-                <span><strong>Payment ID:</strong></span>
-                <span>' . htmlspecialchars($razorpayPaymentId) . '</span>
-            </div>
-            <div class="detail-row">
-                <span><strong>Order ID:</strong></span>
-                <span>' . htmlspecialchars($razorpayOrderId) . '</span>
-            </div>
-            <div class="detail-row">
-                <span><strong>Amount:</strong></span>
-                <span>₹' . number_format((float)$payment->amount, 2) . '</span>
-            </div>
-            <div class="detail-row">
-                <span><strong>Status:</strong></span>
-                <span style="color: #28a745; font-weight: bold;">Completed</span>
-            </div>
+        <div class="redirect-info">
+            <strong>Payment ID:</strong> ' . htmlspecialchars($razorpayPaymentId) . '<br>
+            <strong>Order ID:</strong> ' . htmlspecialchars($razorpayOrderId) . '
         </div>
         
-        <a href="#" onclick="window.close()" class="back-button">Close</a>
+        <div class="countdown" id="countdown">Redirecting to app in <span id="timer">3</span> seconds...</div>
     </div>
     
     <script>
-    // For FlutterFlow integration - post message to parent
-    if (window.parent && window.parent !== window) {
-        window.parent.postMessage({
-            type: "payment_success",
-            payment_id: "' . htmlspecialchars($razorpayPaymentId) . '",
-            order_id: "' . htmlspecialchars($razorpayOrderId) . '",
-            amount: ' . $payment->amount . ',
-            status: "PAID"
-        }, "*");
-    }
+    // Countdown timer
+    let timeLeft = 3;
+    const timerElement = document.getElementById("timer");
+    const countdownElement = document.getElementById("countdown");
+    
+    const countdown = setInterval(() => {
+        timeLeft--;
+        timerElement.textContent = timeLeft;
+        
+        if (timeLeft <= 0) {
+            clearInterval(countdown);
+            countdownElement.textContent = "Redirecting now...";
+            
+            // Try multiple methods to close/redirect for FlutterFlow
+            setTimeout(() => {
+                // Method 1: Post message to parent (for WebView)
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({
+                        type: "payment_success",
+                        action: "close_webview",
+                        payment_id: "' . htmlspecialchars($razorpayPaymentId) . '",
+                        order_id: "' . htmlspecialchars($razorpayOrderId) . '",
+                        amount: ' . $payment->amount . ',
+                        status: "PAID",
+                        redirect_to_main: true
+                    }, "*");
+                }
+                
+                // Method 2: Try to close window
+                try {
+                    window.close();
+                } catch(e) {
+                    console.log("Cannot close window:", e);
+                }
+                
+                // Method 3: Redirect to a custom URL scheme (for FlutterFlow deep linking)
+                try {
+                    window.location.href = "flutterflow://payment-success?payment_id=' . htmlspecialchars($razorpayPaymentId) . '&order_id=' . htmlspecialchars($razorpayOrderId) . '&amount=' . $payment->amount . '";
+                } catch(e) {
+                    console.log("Custom URL scheme not supported:", e);
+                }
+                
+                // Method 4: Fallback - redirect to success URL with parameters
+                setTimeout(() => {
+                    window.location.href = "about:blank";
+                }, 500);
+                
+            }, 500);
+        }
+    }, 1000);
+    
+    // Immediate post message on load
+    window.addEventListener("load", function() {
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage({
+                type: "payment_success",
+                payment_id: "' . htmlspecialchars($razorpayPaymentId) . '",
+                order_id: "' . htmlspecialchars($razorpayOrderId) . '",
+                amount: ' . $payment->amount . ',
+                status: "PAID",
+                redirect_to_main: true
+            }, "*");
+        }
+    });
+    
+    // Listen for messages from parent (FlutterFlow)
+    window.addEventListener("message", function(event) {
+        if (event.data && event.data.type === "close_payment_webview") {
+            window.close();
+        }
+    });
     </script>
 </body>
 </html>';
@@ -855,5 +923,89 @@ class RazorpayController extends Controller
 </html>';
 
         return response($html, 200, ['Content-Type' => 'text/html']);
+    }
+
+    /**
+     * API endpoint for FlutterFlow to check payment success and get navigation data
+     */
+    public function paymentSuccess(Request $request)
+    {
+        try {
+            $orderId = $request->input('order_id') ?? $request->query('order_id');
+            $paymentId = $request->input('payment_id') ?? $request->query('payment_id');
+            
+            if (!$orderId && !$paymentId) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Order ID or Payment ID is required'
+                ], 400);
+            }
+
+            // Find payment by order_id or payment_id
+            $payment = null;
+            if ($orderId) {
+                $payment = Payment::where('gateway_order_id', $orderId)->where('gateway', 'razorpay')->first();
+            } elseif ($paymentId) {
+                $payment = Payment::where('gateway_payment_id', $paymentId)->where('gateway', 'razorpay')->first();
+            }
+
+            if (!$payment) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Payment not found'
+                ], 404);
+            }
+
+            // Check if payment is successful
+            if ($payment->status === 'PAID') {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Payment successful',
+                    'navigation' => [
+                        'action' => 'redirect_to_main',
+                        'close_webview' => true,
+                        'show_success_message' => true
+                    ],
+                    'payment_data' => [
+                        'order_id' => $payment->order_id,
+                        'razorpay_order_id' => $payment->gateway_order_id,
+                        'payment_id' => $payment->gateway_payment_id,
+                        'amount' => $payment->amount,
+                        'currency' => $payment->currency,
+                        'status' => $payment->status,
+                        'paid_at' => $payment->paid_at,
+                        'description' => $payment->description
+                    ]
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Payment not completed',
+                    'navigation' => [
+                        'action' => 'show_error',
+                        'close_webview' => false,
+                        'retry_payment' => true
+                    ],
+                    'payment_data' => [
+                        'order_id' => $payment->order_id,
+                        'status' => $payment->status,
+                        'amount' => $payment->amount
+                    ]
+                ]);
+            }
+
+        } catch (Exception $e) {
+            Log::error('Razorpay payment success check error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to check payment status',
+                'error' => $e->getMessage(),
+                'navigation' => [
+                    'action' => 'show_error',
+                    'close_webview' => false,
+                    'retry_payment' => true
+                ]
+            ], 500);
+        }
     }
 }
