@@ -74,12 +74,21 @@ class RazorpayController extends Controller
         try {
             $request->validate([
                 'amount' => 'required|numeric|min:1',
-                'user_id' => 'required|exists:users,id',
+                'user_id' => 'required|integer',
                 'description' => 'string|max:255',
                 'return_url' => 'url'
             ]);
 
+            // Get user details if user exists, otherwise use default values
             $user = User::find($request->user_id);
+            if (!$user) {
+                // Create a temporary user object with default values
+                $user = (object) [
+                    'id' => $request->user_id,
+                    'name' => 'Guest User',
+                    'email' => 'guest@example.com'
+                ];
+            }
             $orderId = 'RZP_ORDER_' . time() . '_' . Str::random(6);
             
             // Convert amount to paisa (Razorpay uses smallest currency unit)
@@ -351,7 +360,7 @@ class RazorpayController extends Controller
     {
         try {
             $request->validate([
-                'user_id' => 'required|exists:users,id',
+                'user_id' => 'required|integer',
                 'status' => 'nullable|string|in:CREATED,PAID,FAILED,CANCELLED',
                 'limit' => 'nullable|integer|min:1|max:100'
             ]);
