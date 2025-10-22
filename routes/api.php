@@ -28,39 +28,42 @@ Route::get('/AllAccountsByUser/{user_id}', [AccountController::class, 'allAccoun
 Route::post('/upload-file', [FileController::class, 'upload']);
 Route::post('/number-to-words', [NumberController::class, 'numberToWords']);
 
-// Payment Routes for Cashfree Integration
-Route::post('/payment/create', [PaymentController::class, 'createPayment']);
-Route::get('/payment/status', [PaymentController::class, 'getPaymentStatus']);
-Route::post('/payment/status', [PaymentController::class, 'getPaymentStatus']); // Accept POST for FlutterFlow
-Route::get('/payment/user-payments', [PaymentController::class, 'getUserPayments']);
-Route::post('/payment/user-payments', [PaymentController::class, 'getUserPayments']); // Accept POST for FlutterFlow
-Route::post('/payment/refund', [PaymentController::class, 'refundPayment']);
+// Payment Routes - Redirected to Razorpay (for backward compatibility)
+Route::post('/payment/create', [RazorpayController::class, 'createPayment']);
+Route::get('/payment/status', [RazorpayController::class, 'getPaymentStatus']);
+Route::post('/payment/status', [RazorpayController::class, 'getPaymentStatus']); // Accept POST for FlutterFlow
+Route::get('/payment/user-payments', [RazorpayController::class, 'getUserPayments']);
+Route::post('/payment/user-payments', [RazorpayController::class, 'getUserPayments']); // Accept POST for FlutterFlow
+Route::post('/payment/refund', [RazorpayController::class, 'refundPayment']);
 
-// Payment Callback Routes (these should be accessible without authentication)
-Route::get('/payment/callback', [PaymentController::class, 'handleCallback'])->name('payment.callback');
-Route::post('/payment/webhook', [PaymentController::class, 'handleWebhook'])->name('payment.webhook');
+// Payment Callback Routes - Redirected to Razorpay
+Route::get('/payment/callback', [RazorpayController::class, 'callback'])->name('payment.callback');
+Route::post('/payment/callback', [RazorpayController::class, 'callback']);
 
 // Test route for payment system
 Route::get('/payment/test', function () {
     return response()->json([
-        'message' => 'Cashfree Payment System is ready! (PRODUCTION MODE)',
-        'environment' => 'production',
-        'app_id_configured' => !empty(env('CASHFREE_APP_ID')),
-        'secret_configured' => !empty(env('CASHFREE_SECRET_KEY')),
+        'message' => 'Razorpay Payment System is ready! (SANDBOX MODE)',
+        'environment' => 'sandbox',
+        'gateway' => 'razorpay',
+        'key_id_configured' => !empty(env('RAZORPAY_KEY_ID', 'rzp_test_RUX03OJs024Yes')),
+        'key_secret_configured' => !empty(env('RAZORPAY_KEY_SECRET', '212wP4jHAaC68JgtIzs76xpN')),
         'timestamp' => now(),
         'base_url' => 'https://ourprojectapi.sroy.es/public/api/',
-        'cashfree_urls' => [
-            'api_base' => 'https://api.cashfree.com',
-            'checkout_base' => 'https://payments.cashfree.com/pay/'
+        'razorpay_urls' => [
+            'api_base' => 'https://api.razorpay.com/v1',
+            'checkout_page' => 'Custom payment page with Razorpay integration'
         ],
         'endpoints' => [
-            'create_payment' => 'POST /payment/create',
-            'check_status' => 'GET|POST /payment/status', 
-            'user_payments' => 'GET|POST /payment/user-payments',
-            'callback' => 'GET /payment/callback',
-            'webhook' => 'POST /payment/webhook'
+            'create_payment' => 'POST /payment/create (redirected to Razorpay)',
+            'create_razorpay' => 'POST /razorpay/create',
+            'check_status' => 'GET|POST /payment/status (redirected to Razorpay)', 
+            'user_payments' => 'GET|POST /payment/user-payments (redirected to Razorpay)',
+            'callback' => 'POST /payment/callback (redirected to Razorpay)',
+            'razorpay_callback' => 'POST /razorpay/callback',
+            'payment_page' => 'GET /razorpay/payment-page'
         ],
-        'warning' => '⚠️ PRODUCTION MODE - Use real payment credentials and amounts!'
+        'note' => '✅ All payment routes now use Razorpay. Cashfree has been removed.'
     ]);
 });
 
@@ -91,16 +94,18 @@ Route::get('/razorpay/test', function () {
         'base_url' => 'https://ourprojectapi.sroy.es/public/api/',
         'razorpay_urls' => [
             'api_base' => 'https://api.razorpay.com/v1',
-            'checkout_base' => 'https://api.razorpay.com/v1/checkout/embedded'
+            'payment_page_base' => 'https://ourprojectapi.sroy.es/public/api/razorpay/payment-page'
         ],
         'endpoints' => [
-            'create_payment' => 'POST /razorpay/create',
+            'create_payment' => 'POST /razorpay/create (also /payment/create)',
             'verify_payment' => 'POST /razorpay/verify',
-            'check_status' => 'GET|POST /razorpay/status',
-            'user_payments' => 'GET|POST /razorpay/user-payments',
-            'refund' => 'POST /razorpay/refund',
-            'callback' => 'GET /razorpay/callback',
-            'cancel' => 'GET /razorpay/cancel'
+            'check_status' => 'GET|POST /razorpay/status (also /payment/status)',
+            'user_payments' => 'GET|POST /razorpay/user-payments (also /payment/user-payments)',
+            'refund' => 'POST /razorpay/refund (also /payment/refund)',
+            'payment_page' => 'GET /razorpay/payment-page',
+            'callback' => 'POST /razorpay/callback (also /payment/callback)',
+            'cancel' => 'GET /razorpay/cancel',
+            'success_check' => 'GET|POST /razorpay/payment-success'
         ],
         'credentials' => [
             'key_id' => 'rzp_test_RUX03OJs024Yes',
@@ -113,35 +118,18 @@ Route::get('/razorpay/test', function () {
 Route::get('/test-connection', function () {
     return response()->json([
         'success' => true,
-        'message' => 'API connection successful',
+        'message' => 'API connection successful - Razorpay Only',
         'server_time' => now(),
         'ready_for_flutterflow' => true,
-        'payment_gateways' => [
-            'cashfree' => 'production',
-            'razorpay' => 'sandbox'
-        ]
-    ]);
-});
-
-// Debug endpoint for payment testing
-Route::post('/payment/debug-create', function (Request $request) {
-    $sampleSessionId = 'session_prod_debug_456';
-    $paymentUrl = 'https://payments.cashfree.com/pay/' . $sampleSessionId;
-    
-    return response()->json([
-        'success' => true,
-        'message' => 'Debug payment creation (PRODUCTION MODE)',
-        'received_data' => $request->all(),
-        'environment' => 'production',
-        'url_format' => 'https://payments.cashfree.com/pay/{session_id}',
-        'sample_response' => [
-            'order_id' => 'ORDER_' . time() . '_PROD_DEBUG',
-            'cf_order_id' => 'order_prod_debug_123',
-            'payment_session_id' => $sampleSessionId,
-            'amount' => $request->amount ?? 100,
-            'currency' => 'INR',
-            'payment_url' => $paymentUrl
+        'payment_gateway' => 'razorpay',
+        'environment' => 'sandbox',
+        'endpoints' => [
+            'create_payment' => 'POST /payment/create OR /razorpay/create',
+            'payment_status' => 'GET|POST /payment/status OR /razorpay/status',
+            'user_payments' => 'GET|POST /payment/user-payments OR /razorpay/user-payments',
+            'payment_page' => 'GET /razorpay/payment-page',
+            'callback' => 'POST /payment/callback OR /razorpay/callback'
         ],
-        'warning' => '⚠️ This will create REAL payments in production!'
+        'note' => 'All /payment/* endpoints now redirect to Razorpay. Cashfree has been completely removed.'
     ]);
 });
