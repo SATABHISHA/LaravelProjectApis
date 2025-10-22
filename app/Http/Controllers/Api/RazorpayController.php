@@ -135,28 +135,16 @@ class RazorpayController extends Controller
             if ($response->successful()) {
                 $responseData = $response->json();
                 
-                // Update payment with Razorpay data - backward compatible
-                $updateData = [];
+                // Update payment with Razorpay data - direct approach
+                $payment->gateway_order_id = $responseData['id'];
+                $payment->gateway_response = $responseData;
+                $payment->save();
                 
-                // Only set gateway fields if columns exist
-                try {
-                    if (Schema::hasColumn('payments', 'gateway_order_id')) {
-                        $updateData['gateway_order_id'] = $responseData['id'];
-                    }
-                    if (Schema::hasColumn('payments', 'gateway_response')) {
-                        $updateData['gateway_response'] = $responseData;
-                    }
-                } catch (Exception $e) {
-                    // Columns don't exist, use fallback
-                }
-                
-                // Always store in a field that exists (fallback to existing structure)
-                if (empty($updateData)) {
-                    // Use existing cashfree_response field as fallback for gateway data
-                    $updateData['cashfree_response'] = $responseData;
-                }
-                
-                $payment->update($updateData);
+                Log::info('Payment updated with Razorpay data', [
+                    'payment_id' => $payment->id,
+                    'gateway_order_id' => $payment->gateway_order_id,
+                    'razorpay_order_id' => $responseData['id']
+                ]);
 
                 // Create Razorpay checkout URL
                 $checkoutUrl = $this->generateCheckoutUrl($responseData, $user, $request);
@@ -784,6 +772,13 @@ class RazorpayController extends Controller
             $razorpayOrderId = $request->razorpay_order_id;
             $razorpaySignature = $request->razorpay_signature;
 
+            // Log the callback data for debugging
+            Log::info('Razorpay callback received', [
+                'razorpay_payment_id' => $razorpayPaymentId,
+                'razorpay_order_id' => $razorpayOrderId,
+                'razorpay_signature' => $razorpaySignature
+            ]);
+
             // Verify payment signature
             $signature = hash_hmac('sha256', 
                 $razorpayOrderId . '|' . $razorpayPaymentId, 
@@ -794,8 +789,47 @@ class RazorpayController extends Controller
                 throw new Exception('Invalid payment signature');
             }
 
-            // Update payment status - use helper method for backward compatibility
-            $payment = $this->findPaymentByRazorpayOrderId($razorpayOrderId);
+            // Update payment status - try multiple methods to find payment
+            $payment = null;
+            
+            // Method 1: Try to find by gateway_order_id
+            if (Schema::hasColumn('payments', 'gateway_order_id')) {
+                $payment = Payment::where('gateway_order_id', $razorpayOrderId)->first();
+                Log::info('Method 1 - gateway_order_id search', ['found' => $payment ? 'yes' : 'no']);
+            }
+            
+            // Method 2: If not found, try to find by the order pattern in order_id and check gateway_response
+            if (!$payment) {
+                $payments = Payment::where('order_id', 'LIKE', 'RZP_ORDER_%')
+                    ->where('created_at', '>=', now()->subHours(2))
+                    ->get();
+                    
+                foreach ($payments as $p) {
+                    // Check if this payment has the razorpay order ID in its response data
+                    $gatewayResponse = $p->gateway_response; // Already cast to array by Laravel
+                    
+                    // Also check cashfree_response as fallback
+                    if (!$gatewayResponse && $p->cashfree_response) {
+                        $gatewayResponse = is_array($p->cashfree_response) ? $p->cashfree_response : json_decode($p->cashfree_response ?? '{}', true);
+                    }
+                    
+                    if ($gatewayResponse && isset($gatewayResponse['id']) && $gatewayResponse['id'] === $razorpayOrderId) {
+                        $payment = $p;
+                        Log::info('Method 2 - found payment by response data', ['payment_id' => $payment->id]);
+                        break;
+                    }
+                }
+            }
+            
+            // Method 3: If still not found, get the most recent unpaid Razorpay payment
+            if (!$payment) {
+                $payment = Payment::where('status', 'CREATED')
+                    ->where('order_id', 'LIKE', 'RZP_ORDER_%')
+                    ->where('created_at', '>=', now()->subHours(2))
+                    ->orderBy('created_at', 'desc')
+                    ->first();
+                Log::info('Method 3 - most recent unpaid payment', ['found' => $payment ? 'yes' : 'no']);
+            }
             
             if ($payment) {
                 // Update payment status - backward compatible
