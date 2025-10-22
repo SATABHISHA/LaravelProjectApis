@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Exception;
 
@@ -23,6 +24,45 @@ class RazorpayController extends Controller
         $this->razorpayBaseUrl = 'https://api.razorpay.com/v1';
         $this->keyId = env('RAZORPAY_KEY_ID', 'rzp_test_RUX03OJs024Yes');
         $this->keySecret = env('RAZORPAY_KEY_SECRET', '212wP4jHAaC68JgtIzs76xpN');
+    }
+
+    /**
+     * Helper method to find payment by Razorpay order ID (backward compatible)
+     */
+    private function findPaymentByRazorpayOrderId($razorpayOrderId)
+    {
+        try {
+            // First try to find by gateway_order_id column if it exists
+            if (Schema::hasColumn('payments', 'gateway_order_id')) {
+                $payment = Payment::where('gateway_order_id', $razorpayOrderId)->first();
+                if ($payment) return $payment;
+            }
+        } catch (Exception $e) {
+            // Column doesn't exist, continue to fallback
+        }
+        
+        // Fallback: Look for payments by order_id pattern or in response data
+        // Check if it's a recent Razorpay order by pattern
+        $payment = Payment::where('order_id', 'LIKE', 'RZP_ORDER_%')
+            ->where('created_at', '>=', now()->subDays(1)) // Recent orders only
+            ->get()
+            ->filter(function($p) use ($razorpayOrderId) {
+                // Check if the razorpay order ID is stored in any response field
+                $responses = [
+                    $p->cashfree_response ?? [],
+                    json_decode($p->gateway_response ?? '{}', true),
+                ];
+                
+                foreach ($responses as $response) {
+                    if (is_array($response) && isset($response['id']) && $response['id'] === $razorpayOrderId) {
+                        return true;
+                    }
+                }
+                return false;
+            })
+            ->first();
+            
+        return $payment;
     }
 
     /**
@@ -45,17 +85,27 @@ class RazorpayController extends Controller
             // Convert amount to paisa (Razorpay uses smallest currency unit)
             $amountInPaisa = $request->amount * 100;
 
-            // Create payment record
-            $payment = Payment::create([
+            // Create payment record - backward compatible
+            $paymentData = [
                 'user_id' => $request->user_id,
                 'order_id' => $orderId,
                 'amount' => $request->amount,
                 'currency' => 'INR',
                 'status' => 'CREATED',
                 'description' => $request->description ?? 'Payment for order',
-                'return_url' => $request->return_url,
-                'gateway' => 'razorpay'
-            ]);
+                'return_url' => $request->return_url
+            ];
+            
+            // Only set gateway field if column exists
+            try {
+                if (Schema::hasColumn('payments', 'gateway')) {
+                    $paymentData['gateway'] = 'razorpay';
+                }
+            } catch (Exception $e) {
+                // Column doesn't exist, skip it
+            }
+            
+            $payment = Payment::create($paymentData);
 
             // Prepare Razorpay order data
             $orderData = [
@@ -76,10 +126,28 @@ class RazorpayController extends Controller
             if ($response->successful()) {
                 $responseData = $response->json();
                 
-                $payment->update([
-                    'gateway_order_id' => $responseData['id'],
-                    'gateway_response' => $responseData
-                ]);
+                // Update payment with Razorpay data - backward compatible
+                $updateData = [];
+                
+                // Only set gateway fields if columns exist
+                try {
+                    if (Schema::hasColumn('payments', 'gateway_order_id')) {
+                        $updateData['gateway_order_id'] = $responseData['id'];
+                    }
+                    if (Schema::hasColumn('payments', 'gateway_response')) {
+                        $updateData['gateway_response'] = $responseData;
+                    }
+                } catch (Exception $e) {
+                    // Columns don't exist, use fallback
+                }
+                
+                // Always store in a field that exists (fallback to existing structure)
+                if (empty($updateData)) {
+                    // Use existing cashfree_response field as fallback for gateway data
+                    $updateData['cashfree_response'] = $responseData;
+                }
+                
+                $payment->update($updateData);
 
                 // Create Razorpay checkout URL
                 $checkoutUrl = $this->generateCheckoutUrl($responseData, $user, $request);
@@ -716,16 +784,37 @@ class RazorpayController extends Controller
                 throw new Exception('Invalid payment signature');
             }
 
-            // Update payment status
-            $payment = Payment::where('gateway_order_id', $razorpayOrderId)->first();
+            // Update payment status - use helper method for backward compatibility
+            $payment = $this->findPaymentByRazorpayOrderId($razorpayOrderId);
             
             if ($payment) {
-                $payment->update([
+                // Update payment status - backward compatible
+                $updateData = [
                     'status' => 'PAID',
-                    'gateway_payment_id' => $razorpayPaymentId,
-                    'gateway_response' => json_encode($request->all()),
                     'paid_at' => now()
-                ]);
+                ];
+                
+                // Only set gateway fields if columns exist
+                try {
+                    if (Schema::hasColumn('payments', 'gateway_payment_id')) {
+                        $updateData['gateway_payment_id'] = $razorpayPaymentId;
+                    }
+                    if (Schema::hasColumn('payments', 'gateway_response')) {
+                        $updateData['gateway_response'] = json_encode($request->all());
+                    }
+                } catch (Exception $e) {
+                    // Columns don't exist, use fallback
+                }
+                
+                // Fallback: use existing fields
+                if (!isset($updateData['gateway_payment_id'])) {
+                    $updateData['cf_payment_id'] = $razorpayPaymentId; // Use existing field as fallback
+                }
+                if (!isset($updateData['gateway_response'])) {
+                    $updateData['cashfree_response'] = json_decode(json_encode($request->all()), true);
+                }
+                
+                $payment->update($updateData);
 
                 // For FlutterFlow integration - redirect to success page with auto-close
                 $html = '<!DOCTYPE html>
