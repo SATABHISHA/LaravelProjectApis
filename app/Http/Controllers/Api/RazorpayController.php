@@ -22,8 +22,12 @@ class RazorpayController extends Controller
     {
         // Razorpay configuration
         $this->razorpayBaseUrl = 'https://api.razorpay.com/v1';
-        $this->keyId = env('RAZORPAY_KEY_ID', 'rzp_test_RUX03OJs024Yes');
-        $this->keySecret = env('RAZORPAY_KEY_SECRET', '212wP4jHAaC68JgtIzs76xpN');
+        // LIVE KEYS
+        $this->keyId = 'rzp_live_RaLYdhoChCz6XH';
+        $this->keySecret = 'DsVdu8c3AmlW6Ysnom1vHbXw';
+        // TEST KEYS (commented for future use)
+        // $this->keyId = 'rzp_test_RUX03OJs024Yes';
+        // $this->keySecret = '212wP4jHAaC68JgtIzs76xpN';
     }
 
     /**
