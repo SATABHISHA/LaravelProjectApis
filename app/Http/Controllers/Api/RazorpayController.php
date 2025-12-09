@@ -213,7 +213,7 @@ class RazorpayController extends Controller
             'amount' => $razorpayOrder['amount'],
             'currency' => $razorpayOrder['currency'],
             'key' => $this->keyId,
-            'name' => urlencode('FlutterFlow Payment'),
+            'name' => urlencode('Temple Management Payment'),
             'description' => urlencode($request->description ?? 'Payment for order'),
             'prefill_name' => urlencode($user->name),
             'prefill_email' => urlencode($user->email ?? 'user@example.com'),
